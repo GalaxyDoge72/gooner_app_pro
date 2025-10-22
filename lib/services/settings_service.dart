@@ -27,7 +27,8 @@ class SettingsService extends ChangeNotifier {
   static const String _DanbooruUserIdKey = "danbooruUserID";
   static const String _DanbooruApiKeyKey = "danbooruApiKey";
 
-  static const bool
+  static const String _showAIContentKey = "showAIContent";
+  static const bool _showAIContent = false;
 
   // State properties
   bool isDarkModeEnabled = _darkModeDefault;
