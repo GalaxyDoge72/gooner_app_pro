@@ -28,7 +28,7 @@ class SettingsService extends ChangeNotifier {
   static const String _DanbooruApiKeyKey = "danbooruApiKey";
 
   static const String _showAIContentKey = "showAIContent";
-  static const bool _showAIContent = false;
+  static const bool _showAIContentDefault = false;
 
   // State properties
   bool isDarkModeEnabled = _darkModeDefault;
@@ -37,6 +37,7 @@ class SettingsService extends ChangeNotifier {
   int e621PostAmount = _e621PostLimitDefault;
   int r34PostAmount = _r34PostLimitDefault;
   int danbooruPostAmount = _danbooruPostLimitDefault;
+  bool showAIContent = _showAIContentDefault;
   
   // NEW: Rule34 Auth State
   String r34UserId = '';
@@ -72,8 +73,6 @@ class SettingsService extends ChangeNotifier {
     _isInitialLoadComplete = true; 
     notifyListeners();
   }
-
-  // ... (existing setter methods for dark mode, warnings, limits) ...
 
   void setDarkMode(bool isEnabled) {
     isDarkModeEnabled = isEnabled;
@@ -139,6 +138,12 @@ class SettingsService extends ChangeNotifier {
   void setDanbooruApiKey(String key) {
     danbooruApiKey = key.trim();
     _prefs.setString(_DanbooruApiKeyKey, danbooruApiKey);
+  }
+
+  void setShowAIContent(bool isEnabled) {
+    showAIContent = isEnabled;
+    _prefs.setBool(_showAIContentKey, isEnabled);
+    notifyListeners();
   }
 
 }
