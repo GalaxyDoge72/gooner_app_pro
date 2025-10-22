@@ -1,3 +1,3 @@
 # gooner_app_pro
 
-A new Flutter project.
+not my proudest project. Written in dart for cross compatibility.
