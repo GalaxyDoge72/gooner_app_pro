@@ -6,8 +6,7 @@ import 'package:gooner_app_pro/models/e621_post.dart';
 import 'package:gooner_app_pro/models/root_object.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-
-import '../settings_service.dart'; // Contains SettingsService
+import 'package:gooner_app_pro/services/settings_service.dart';
 
 class E621Screen extends StatefulWidget {
   const E621Screen({super.key});

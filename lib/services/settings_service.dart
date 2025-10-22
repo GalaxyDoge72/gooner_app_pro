@@ -41,7 +41,7 @@ class SettingsService extends ChangeNotifier {
   int r34PostAmount = _r34PostLimitDefault;
   int danbooruPostAmount = _danbooruPostLimitDefault;
   bool showAIContent = _showAIContentDefault;
-  bool debugMode = _debugModeDefault;
+  bool isdebugMode = _debugModeDefault;
   
   // NEW: Rule34 Auth State
   String r34UserId = '';
@@ -151,7 +151,7 @@ class SettingsService extends ChangeNotifier {
   }
 
   void setDebugMode(bool isEnabled){
-    debugMode = isEnabled;
+    isdebugMode = isEnabled;
     _prefs.setBool(_debugModeKey, isEnabled);
     notifyListeners();
   }

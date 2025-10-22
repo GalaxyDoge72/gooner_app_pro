@@ -3,7 +3,7 @@ import 'package:gooner_app_pro/screens/image_screen.dart';
 import 'package:provider/provider.dart';
 import 'main_page.dart';
 import 'screens/settings_screen.dart'; // Import the SettingsScreen
-import 'settings_service.dart';
+import 'services/settings_service.dart';
 
 void main() async {
   // Ensure Flutter is initialized before accessing SharedPreferences

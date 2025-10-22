@@ -4,7 +4,7 @@ import 'package:gooner_app_pro/screens/rule34_screen.dart';
 import 'package:gooner_app_pro/screens/danbooru_screen.dart';
 import 'package:provider/provider.dart';
 import 'screens/settings_screen.dart';
-import 'settings_service.dart';
+import 'services/settings_service.dart';
 //import 'screens/kemono_screen.dart';
 
 

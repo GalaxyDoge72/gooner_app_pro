@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../settings_service.dart';
+import 'package:gooner_app_pro/services/settings_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -244,6 +244,12 @@ class SettingsContent extends StatelessWidget {
                 onChanged: (newValue) => _handleRealContentToggle(context, settings, newValue),
               ),
 
+              SwitchListTile(
+                title: const Text("Show AI content (ethical gooning mode)"),
+                value: settings.showAIContent,
+                onChanged: settings.setShowAIContent,
+              ),
+
               const Padding(
                 padding: EdgeInsets.fromLTRB(10, 20, 10, 5),
                 child: Center(
@@ -256,7 +262,8 @@ class SettingsContent extends StatelessWidget {
 
               SwitchListTile(
                 title: const Text("Enable debug mode"),
-                value: settings.,
+                value: settings.isdebugMode,
+                onChanged: settings.setDebugMode,
               )
 
             ],

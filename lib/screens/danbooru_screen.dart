@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:gooner_app_pro/models/danbooru_post.dart';
 import 'package:gooner_app_pro/screens/image_screen.dart';
-import '../settings_service.dart';
+import 'package:gooner_app_pro/services/settings_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DanbooruScreen extends StatefulWidget {
