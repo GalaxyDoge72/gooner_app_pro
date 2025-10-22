@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:gooner_app_pro/screens/image_screen.dart';
-import 'package:gooner_app_pro/screens/kemono_screen.dart';
 import 'package:provider/provider.dart';
 import 'main_page.dart';
 import 'screens/settings_screen.dart'; // Import the SettingsScreen
@@ -39,7 +38,6 @@ class MainApp extends StatelessWidget {
                 final args = ModalRoute.of(context)!.settings.arguments;
                 return ImageScreen(post: args);
               },
-              '/kemono': (context) => const KemonoScreen(),
             },
             
             theme: ThemeData(
