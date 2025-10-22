@@ -30,6 +30,9 @@ class SettingsService extends ChangeNotifier {
   static const String _showAIContentKey = "showAIContent";
   static const bool _showAIContentDefault = false;
 
+  static const String _debugModeKey = "isDebugMode";
+  static const bool _debugModeDefault = false;
+
   // State properties
   bool isDarkModeEnabled = _darkModeDefault;
   bool isShowWebmWarningEnabled = _showWebmWarningDefault;
@@ -38,6 +41,7 @@ class SettingsService extends ChangeNotifier {
   int r34PostAmount = _r34PostLimitDefault;
   int danbooruPostAmount = _danbooruPostLimitDefault;
   bool showAIContent = _showAIContentDefault;
+  bool debugMode = _debugModeDefault;
   
   // NEW: Rule34 Auth State
   String r34UserId = '';
@@ -146,4 +150,9 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setDebugMode(bool isEnabled){
+    debugMode = isEnabled;
+    _prefs.setBool(_debugModeKey, isEnabled);
+    notifyListeners();
+  }
 }

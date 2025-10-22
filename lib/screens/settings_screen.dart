@@ -243,6 +243,22 @@ class SettingsContent extends StatelessWidget {
                 value: settings.isRealContentShown,
                 onChanged: (newValue) => _handleRealContentToggle(context, settings, newValue),
               ),
+
+              const Padding(
+                padding: EdgeInsets.fromLTRB(10, 20, 10, 5),
+                child: Center(
+                  child: Text(
+                    "Developer Settings",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20.0),
+                  ),
+                ),
+              ),
+
+              SwitchListTile(
+                title: const Text("Enable debug mode"),
+                value: settings.,
+              )
+
             ],
           ),
         );
