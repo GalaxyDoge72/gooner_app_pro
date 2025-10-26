@@ -5,6 +5,7 @@ import 'package:gooner_app_pro/screens/danbooru_screen.dart';
 import 'package:provider/provider.dart';
 import 'screens/settings_screen.dart';
 import 'services/settings_service.dart';
+import 'screens/waifupics_screen.dart';
 //import 'screens/kemono_screen.dart';
 
 
@@ -20,6 +21,7 @@ final List<IconItem> fakeProviders = [
   IconItem(iconPath: "assets/danbooru_icon.png", label: "Danbooru", targetScreen: DanbooruScreen()),
   IconItem(iconPath: "assets/e621_logo.png", label: "e621.net", targetScreen: E621Screen()),
   IconItem(iconPath: "assets/rule34_logo.png", label: "rule34.xxx", targetScreen: const Rule34Screen()),
+  IconItem(iconPath: "assets/placeholder_logo.png", label: "waifu.pics", targetScreen: WaifuPicsScreen())
   //IconItem(iconPath: "assets/placeholder_logo.png", label: "kemono.cr", targetScreen: KemonoScreen()) 
   // Disabled because Kemono.cr can't fix their fucking api and it returns 403. //
 ];
