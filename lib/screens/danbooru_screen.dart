@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:gooner_app_pro/models/danbooru_post.dart';
@@ -112,7 +113,18 @@ class _DanbooruScreenState extends State<DanbooruScreen> {
 
   Future<void> _fetchPosts() async {
     if (_isLoading || !_hasMore) return;
-    if (_userId.isEmpty || _apiKey.isEmpty) return;
+    if (_userId.isEmpty || _apiKey.isEmpty) {
+    if (mounted) {
+      Future.microtask(() {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("User ID or API Key were empty!"),
+          )
+        );
+      });
+    }
+    return;
+  }
 
     setState(() => _isLoading = true);
 
@@ -122,6 +134,7 @@ class _DanbooruScreenState extends State<DanbooruScreen> {
         'https://danbooru.donmai.us/posts.json?tags=$tags&page=$nextPage&limit=$_postsPerPage&login=${Uri.encodeComponent(_userId)}&api_key=${Uri.encodeComponent(_apiKey)}';
 
     try {
+      log("Using URL: $url");
       final response = await http.get(Uri.parse(url), headers: {
         'User-Agent': 'GoonerAppFlutter/1.0 (by GalaxyDoge72)',
       });

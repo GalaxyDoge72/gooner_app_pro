@@ -3,9 +3,6 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-// HACK: Import R34Post and ImageScreen to navigate
-// This allows us to "fake" a post object for the ImageScreen
-// without having to modify ImageScreen at all.
 import '../models/r34_post.dart';
 import 'image_screen.dart'; // Adjust this import path as needed
 

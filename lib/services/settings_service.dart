@@ -33,6 +33,9 @@ class SettingsService extends ChangeNotifier {
   static const String _debugModeKey = "isDebugMode";
   static const bool _debugModeDefault = false;
 
+  static const String _deviceTypeKey = "knownDevices";
+  static const String _deviceTypeDefault = "unknown";
+
   // State properties
   bool isDarkModeEnabled = _darkModeDefault;
   bool isShowWebmWarningEnabled = _showWebmWarningDefault;
@@ -42,6 +45,7 @@ class SettingsService extends ChangeNotifier {
   int danbooruPostAmount = _danbooruPostLimitDefault;
   bool showAIContent = _showAIContentDefault;
   bool isdebugMode = _debugModeDefault;
+  String deviceType = _deviceTypeDefault;
   
   // NEW: Rule34 Auth State
   String r34UserId = '';
@@ -73,6 +77,8 @@ class SettingsService extends ChangeNotifier {
 
     danbooruUserID = _prefs.getString(_DanbooruUserIdKey) ?? '';
     danbooruApiKey = _prefs.getString(_DanbooruApiKeyKey) ?? '';
+
+    deviceType = _prefs.getString(_deviceTypeKey) ?? _deviceTypeDefault;
     
     _isInitialLoadComplete = true; 
     notifyListeners();
@@ -155,4 +161,11 @@ class SettingsService extends ChangeNotifier {
     _prefs.setBool(_debugModeKey, isEnabled);
     notifyListeners();
   }
+
+  void setDeviceType(String type) {
+    deviceType = type;
+    _prefs.setString(_deviceTypeKey, type);
+    notifyListeners();
+  }
+
 }

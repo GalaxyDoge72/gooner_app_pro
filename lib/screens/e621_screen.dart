@@ -23,7 +23,7 @@ class _E621ScreenState extends State<E621Screen> {
   final http.Client _httpClient = http.Client();
   int _postsPerPage = 25; 
   bool _hasMore = true;
-  String _currentTags = 'rating:safe'; // Matches C# debug logic
+  String _currentTags = 'rating:explicit'; // Matches C# debug logic
   
   // Controller for the TagBox (Entry)
   final TextEditingController _tagController = TextEditingController();

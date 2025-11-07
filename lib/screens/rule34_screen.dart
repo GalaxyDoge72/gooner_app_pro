@@ -105,7 +105,16 @@ class _Rule34ScreenState extends State<Rule34Screen> {
   }
 
   Future<void> _fetchPosts(String tags) async {
-    if (_isLoading || _userId.isEmpty || _apiKey.isEmpty) return;
+    if (_isLoading) return;
+    if (_userId.isEmpty || _apiKey.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("User ID or API Key were empty!"),
+          )
+        );
+      }
+    }
 
     setState(() {
       _isLoading = true;
@@ -138,15 +147,17 @@ class _Rule34ScreenState extends State<Rule34Screen> {
         }
       });
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to load posts: $e')),
         );
       }
     } finally {
-      setState(() {
+      if (mounted) {
+        setState(() {
         _isLoading = false;
       });
+      }
     }
   }
 

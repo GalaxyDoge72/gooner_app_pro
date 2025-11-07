@@ -18,6 +18,15 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
+const List<String> _deviceTypes = [
+  "android",
+  "ios",
+  "macos",
+  "windows",
+  "linux",
+  "unknown"
+];
+
 class SettingsContent extends StatelessWidget {
   const SettingsContent({super.key});
 
@@ -111,6 +120,33 @@ class SettingsContent extends StatelessWidget {
             onChanged: (double newValue) => onChanged(newValue.round()),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDropdownSetting({
+    required BuildContext context,
+    required String title,
+    required String currentValue,
+    required List<String> options,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 8.0),
+      child: DropdownButtonFormField<String>(
+        decoration: InputDecoration(
+          labelText: title,
+          border: const OutlineInputBorder(),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        ),
+        initialValue: currentValue,
+        items: options.map<DropdownMenuItem<String>>((String value) {
+          return DropdownMenuItem<String>(
+            value: value,
+            child: Text(value),
+          );
+        }).toList(),
+        onChanged: onChanged, // Calls the service setter
       ),
     );
   }
@@ -264,8 +300,20 @@ class SettingsContent extends StatelessWidget {
                 title: const Text("Enable debug mode"),
                 value: settings.isdebugMode,
                 onChanged: settings.setDebugMode,
-              )
+              ),
 
+              _buildDropdownSetting(
+                context: context,
+                title: "Device Type",
+                currentValue: settings.deviceType,
+                options: _deviceTypes,
+                onChanged: (String? newVal) {
+                  if (newVal != null) {
+                    settings.setDeviceType(newVal);
+                  }
+                }
+              )
+              
             ],
           ),
         );
