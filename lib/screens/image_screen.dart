@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
+// import 'package:video_player/video_player.dart'; // REMOVED
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 
@@ -9,6 +9,12 @@ import '../models/r34_post.dart';
 import '../models/danbooru_post.dart';
 import '../models/e621_post.dart';
 import '../models/tags_object.dart';
+
+// New imports for iOS Media players //
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 
 class ImageScreen extends StatefulWidget {
@@ -35,20 +41,30 @@ class _ImageScreenState extends State<ImageScreen> {
   late bool isWebm;
   late String tagsText;
 
-  VideoPlayerController? _videoController;
+  // VideoPlayerController? _videoController; // REMOVED
   bool _downloading = false;
   double _progress = 0.0;
   String _speed = "Starting...";
 
+  // Controllers are now used for ALL platforms //
+  Player? _player;
+  VideoController? _videoKitController;
+
   @override
   void initState() {
     super.initState();
+
+    // Initialize media_kit players unconditionally for all platforms
+    _player = Player();
+    _videoKitController = VideoController(_player!);
+
     _setupMedia();
   }
 
   @override
   void dispose() {
-    _videoController?.dispose();
+    // _videoController?.dispose(); // REMOVED
+    _player?.dispose();
     super.dispose();
   }
 
@@ -81,10 +97,11 @@ class _ImageScreenState extends State<ImageScreen> {
     final authUrl = _buildAuthenticatedUrl(fileUrl);
 
     if (isVideo) {
-      _videoController = VideoPlayerController.networkUrl(Uri.parse(authUrl));
-      await _videoController!.initialize();
-      _videoController!.setLooping(true);
-      await _videoController!.play();
+      // Use media_kit for ALL platforms, replacing the conditional logic
+      await _player!.open(Media(authUrl));
+      _player!.setPlaylistMode(PlaylistMode.loop);
+      _player!.play();
+      
       setState(() {});
     }
   }
@@ -150,11 +167,19 @@ class _ImageScreenState extends State<ImageScreen> {
   });
 
   try {
-    // 1️⃣ Ask the user for a save location
-    final String? outputDir = await FilePicker.platform.getDirectoryPath();
-    if (outputDir == null) {
-      setState(() => _downloading = false);
-      return;
+    String? saveDir;
+    bool useShareSheet = Platform.isIOS;
+
+    if (useShareSheet) {
+      final dir = await getTemporaryDirectory();
+      saveDir = dir.path;
+    }
+    else {
+      saveDir = await FilePicker.platform.getDirectoryPath();
+      if (saveDir == null) {
+        setState(() =>  _downloading = false);
+        return;
+      } 
     }
 
     // 2️⃣ Stream the download
@@ -183,7 +208,7 @@ class _ImageScreenState extends State<ImageScreen> {
       }
     }
 
-    final filePath = '$outputDir/$fileName';
+    final filePath = '$saveDir/$fileName';
     final file = File(filePath);
     final total = response.contentLength ?? -1;
     var received = 0;
@@ -206,6 +231,11 @@ class _ImageScreenState extends State<ImageScreen> {
 
     await sink.close();
     stopwatch.stop();
+
+    if (useShareSheet) {
+      final xfile = XFile(filePath, name: fileName);
+      await Share.shareXFiles([xfile], text: 'Downloaded: $fileName');
+    }
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -237,6 +267,7 @@ class _ImageScreenState extends State<ImageScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        // ... (AppBar is unchanged) ...
         title: const Text('Image Details'),
         actions: [
           IconButton(
@@ -249,16 +280,15 @@ class _ImageScreenState extends State<ImageScreen> {
         children: [
           Center(
             child: isVideo
-                ? (_videoController != null &&
-                        _videoController!.value.isInitialized)
-                    ? AspectRatio(
-                        aspectRatio: _videoController!.value.aspectRatio,
-                        child: VideoPlayer(_videoController!),
-                      )
-                    : const CircularProgressIndicator()
+                // MODIFIED: Always use the media_kit Video widget for video playback
+                ? Video( 
+                    controller: _videoKitController!,
+                    fit: BoxFit.contain,
+                  )
                 : Image.network(
                     authUrl,
                     fit: BoxFit.contain,
+                    // ... (Image.network logic is unchanged) ...
                     loadingBuilder: (context, child, loading) {
                       if (loading == null) return child;
                       return const Center(child: CircularProgressIndicator());
@@ -272,6 +302,7 @@ class _ImageScreenState extends State<ImageScreen> {
                     ),
                   ),
           ),
+          // ... (Rest of your Stack children for progress, tags, etc. are unchanged) ...
           if (_downloading)
             Positioned(
               top: 20,

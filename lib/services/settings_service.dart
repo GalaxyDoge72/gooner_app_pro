@@ -20,6 +20,9 @@ class SettingsService extends ChangeNotifier {
   static const String _danbooruPostLimitKey = "danbooruPostLimit";
   static const int _danbooruPostLimitDefault = 20;
 
+  static const String _waifuImPostLimitKey = "waifuImPostLimit";
+  static const int _waifuImPostLimitDefault = 20;
+
   // NEW: Rule34 Auth Keys
   static const String _r34UserIdKey = "r34UserId";
   static const String _r34ApiKeyKey = "r34ApiKey";
@@ -46,6 +49,7 @@ class SettingsService extends ChangeNotifier {
   bool showAIContent = _showAIContentDefault;
   bool isdebugMode = _debugModeDefault;
   String deviceType = _deviceTypeDefault;
+  int waifuImPostAmount = _waifuImPostLimitDefault;
   
   // NEW: Rule34 Auth State
   String r34UserId = '';
@@ -70,6 +74,7 @@ class SettingsService extends ChangeNotifier {
     e621PostAmount = _prefs.getInt(_e621PostLimitKey) ?? _e621PostLimitDefault;
     r34PostAmount = _prefs.getInt(_r34PostLimitKey) ?? _r34PostLimitDefault;
     danbooruPostAmount = _prefs.getInt(_danbooruPostLimitKey) ?? _danbooruPostLimitDefault;
+    waifuImPostAmount = _prefs.getInt(_waifuImPostLimitKey) ?? _waifuImPostLimitDefault;
     
     // NEW: Load Rule34 Auth
     r34UserId = _prefs.getString(_r34UserIdKey) ?? '';
@@ -123,6 +128,13 @@ class SettingsService extends ChangeNotifier {
       danbooruPostAmount = amount;
       _prefs.setInt(_danbooruPostLimitKey, amount);
       notifyListeners();
+    }
+  }
+
+  void setWaifuImPostLimit(int amount) {
+    if (amount > 0) {
+      waifuImPostAmount = amount;
+      _prefs.setInt(_waifuImPostLimitKey, amount);
     }
   }
 

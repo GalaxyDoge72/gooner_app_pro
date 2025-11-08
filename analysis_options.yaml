@@ -2,5 +2,6 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   errors:
     constant_identifier_names: ignore
+    prefer_final_fields: ignore
     unused_element: ignore
     unused_field: ignore

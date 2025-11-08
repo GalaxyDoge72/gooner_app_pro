@@ -229,6 +229,13 @@ class SettingsContent extends StatelessWidget {
                 settings.r34PostAmount, 
                 settings.setR34PostLimit
               ),
+              
+              _buildLimitSlider(
+                context,
+                "Waifu.im Post Limit (per page)",
+                settings.waifuImPostAmount,
+                settings.setWaifuImPostLimit
+              ),
 
               // --- danbooru.donmai Post Limit Slider ---
               _buildLimitSlider(

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'screens/settings_screen.dart';
 import 'services/settings_service.dart';
 import 'screens/waifupics_screen.dart';
+import 'screens/waifuim_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 
@@ -21,7 +22,8 @@ final List<IconItem> fakeProviders = [
   IconItem(iconPath: "assets/danbooru_icon.png", label: "Danbooru", targetScreen: DanbooruScreen()),
   IconItem(iconPath: "assets/e621_logo.png", label: "e621.net", targetScreen: E621Screen()),
   IconItem(iconPath: "assets/rule34_logo.png", label: "rule34.xxx", targetScreen: const Rule34Screen()),
-  IconItem(iconPath: "assets/placeholder_logo.png", label: "waifu.pics", targetScreen: WaifuPicsScreen())
+  IconItem(iconPath: "assets/placeholder_logo.png", label: "waifu.pics", targetScreen: WaifuPicsScreen()),
+  IconItem(iconPath: "assets/placeholder_logo.png", label: "waifu.im", targetScreen: WaifuImScreen())
 ];
 
 // Placeholder list for the hidden "Real" content providers
