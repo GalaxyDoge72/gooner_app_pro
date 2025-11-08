@@ -22,8 +22,8 @@ final List<IconItem> fakeProviders = [
   IconItem(iconPath: "assets/danbooru_icon.png", label: "Danbooru", targetScreen: DanbooruScreen()),
   IconItem(iconPath: "assets/e621_logo.png", label: "e621.net", targetScreen: E621Screen()),
   IconItem(iconPath: "assets/rule34_logo.png", label: "rule34.xxx", targetScreen: const Rule34Screen()),
-  IconItem(iconPath: "assets/placeholder_logo.png", label: "waifu.pics", targetScreen: WaifuPicsScreen()),
-  IconItem(iconPath: "assets/placeholder_logo.png", label: "waifu.im", targetScreen: WaifuImScreen())
+  IconItem(iconPath: "assets/waifu_pics_logo.png", label: "waifu.pics", targetScreen: WaifuPicsScreen()),
+  IconItem(iconPath: "assets/waifu_im_logo.png", label: "waifu.im", targetScreen: WaifuImScreen())
 ];
 
 // Placeholder list for the hidden "Real" content providers
