@@ -75,7 +75,7 @@ class _E621ScreenState extends State<E621Screen> {
     });
     
     try {
-      log("Using URL: $uri");
+       
       final response = await _httpClient.get(
         uri, 
         // User-Agent is mandatory for e621

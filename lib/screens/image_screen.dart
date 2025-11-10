@@ -48,7 +48,14 @@ class _ImageScreenState extends State<ImageScreen> {
   // MediaKit Controllers
   Player? _player;
   VideoController? _videoKitController;
-  String? _mediaError; // ⭐ NEW: State variable to store media player error
+  String? _mediaError; 
+
+  // ⭐ NEW: Media Loading State Variables
+  bool _mediaLoading = true; 
+  double _mediaLoadingProgress = 0.0; // 0.0 to 1.0 for video buffering
+
+  // Key to reference the download button's position for iOS share sheet
+  final GlobalKey _downloadButtonKey = GlobalKey(); 
 
   @override
   void initState() {
@@ -58,10 +65,9 @@ class _ImageScreenState extends State<ImageScreen> {
     _player = Player();
     _videoKitController = VideoController(_player!);
 
-    // ⭐ NEW: Subscribe to the error stream to capture playback issues
+    // Subscribe to the error stream to capture playback issues
     _player!.stream.error.listen((error) {
       if (mounted) {
-        // Update state with the error message when an error occurs
         setState(() {
           log('MediaKit Error: $error');
           _mediaError = 'Playback Error: $error. Check URL or Codec.';
@@ -81,10 +87,15 @@ class _ImageScreenState extends State<ImageScreen> {
   Future<void> _setupMedia() async {
     final post = widget.post;
 
+    setState(() {
+      _mediaLoading = true;
+      _mediaLoadingProgress = 0.0;
+    });
+
     // Determine type and URL
     if (post is R34Post) {
       fileUrl = post.fileUrl ?? '';
-      isVideo = post.isVideo || post.isWebmVideo; // Check for any video type
+      isVideo = post.isVideo || post.isWebmVideo;
       isWebm = post.isWebmVideo;
       tagsText = _extractR34Tags(post);
     } else if (post is DanbooruPost) {
@@ -107,12 +118,38 @@ class _ImageScreenState extends State<ImageScreen> {
     final authUrl = _buildAuthenticatedUrl(fileUrl);
 
     if (isVideo && authUrl.isNotEmpty) {
-      // Use media_kit for ALL platforms, replacing the conditional logic
+      
+      // 1. Subscribe to the buffering stream for video progress
+      _player!.stream.buffering.listen((isBuffering) {
+        // We only care about progress when buffering or when loading
+        if (isBuffering || _mediaLoading) {
+          final buffered = _player!.state.buffer.inMilliseconds;
+          final total = _player!.state.duration.inMilliseconds;
+          
+          if (total > 0 && mounted) {
+            setState(() {
+              _mediaLoadingProgress = buffered / total;
+            });
+          }
+        }
+      });
+      
+      // 2. Listen for the first play state (media loaded)
+      _player!.stream.playing.listen((isPlaying) {
+        if (isPlaying && _mediaLoading && mounted) {
+          setState(() {
+            _mediaLoading = false; // Video is loaded and playing
+            _mediaLoadingProgress = 1.0;
+          });
+        }
+      });
+
       await _player!.open(Media(authUrl));
       _player!.setPlaylistMode(PlaylistMode.loop);
       _player!.play();
       
-      setState(() {});
+    } else {
+      // If it's an image, the loading state will be handled by Image.network's builder
     }
   }
 
@@ -193,7 +230,6 @@ class _ImageScreenState extends State<ImageScreen> {
         saveDir = dir.path;
       } else {
         try {
-          // This returns a String? (nullable string)
           saveDir = await FilePicker.platform.getDirectoryPath();
         } catch (e) {
           log('Caught exception $e');
@@ -209,16 +245,13 @@ class _ImageScreenState extends State<ImageScreen> {
         return;
       }
 
-      // 2️⃣ Stream the download
       final request = http.Request('GET', uri);
       final response = await http.Client().send(request);
 
-      // Determine filename and fallback extension
       String fileName =
           uri.pathSegments.isNotEmpty ? uri.pathSegments.last : 'download';
       final contentType = response.headers['content-type'] ?? '';
 
-      // 3️⃣ Append file extension if missing
       if (!fileName.contains('.')) {
         if (contentType.contains('video/webm')) {
           fileName += '.webm';
@@ -235,7 +268,6 @@ class _ImageScreenState extends State<ImageScreen> {
         }
       }
 
-      // saveDir is guaranteed to be non-null here
       final filePath = '$saveDir/$fileName';
       final file = File(filePath);
       final total = response.contentLength ?? -1;
@@ -260,9 +292,22 @@ class _ImageScreenState extends State<ImageScreen> {
       await sink.close();
       stopwatch.stop();
 
+      // Corrected Fix for iOS Share Sheet Popover (sharePositionOrigin)
       if (useShareSheet) {
+        final RenderBox? box = _downloadButtonKey.currentContext?.findRenderObject() as RenderBox?;
+        
+        Rect? shareRect;
+        if (box != null) {
+          shareRect = box.localToGlobal(Offset.zero) & box.size;
+        }
+
         final xfile = XFile(filePath, name: fileName);
-        await Share.shareXFiles([xfile], text: 'Downloaded: $fileName');
+        
+        await Share.shareXFiles(
+          [xfile], 
+          text: 'Downloaded: $fileName',
+          sharePositionOrigin: shareRect, 
+        );
       }
 
       if (context.mounted) {
@@ -298,6 +343,7 @@ class _ImageScreenState extends State<ImageScreen> {
         title: const Text('Image/Media Details'),
         actions: [
           IconButton(
+            key: _downloadButtonKey,
             icon: const Icon(Icons.download),
             onPressed: _downloading ? null : _downloadFile,
           ),
@@ -308,7 +354,7 @@ class _ImageScreenState extends State<ImageScreen> {
           Center(
             child: isVideo 
                 ? (_mediaError != null
-                    // ⭐ Display error message if playback failed
+                    // Display error message if playback failed
                     ? Padding(
                         padding: const EdgeInsets.all(20.0),
                         child: Text(
@@ -317,20 +363,63 @@ class _ImageScreenState extends State<ImageScreen> {
                           textAlign: TextAlign.center,
                         ),
                       )
-                    // Otherwise, show the video player
-                    : Video(
-                        controller: _videoKitController!,
-                        fit: BoxFit.contain,
+                    // Otherwise, show the video player in a Stack
+                    : Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Video(
+                            controller: _videoKitController!,
+                            fit: BoxFit.contain,
+                          ),
+                          // Video Loading/Buffering Indicator
+                          if (_mediaLoading)
+                            Center(
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.black54,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const CircularProgressIndicator(color: Colors.white),
+                                    const SizedBox(height: 10),
+                                    // Show buffering progress for video
+                                    Text(
+                                      'Buffering: ${(_mediaLoadingProgress * 100).toStringAsFixed(0)}%',
+                                      style: const TextStyle(color: Colors.white),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
                       )
                   )
                 : Image.network(
                     authUrl,
                     fit: BoxFit.contain,
                     loadingBuilder: (context, child, loading) {
-                      if (loading == null) return child;
-                      return const Center(child: CircularProgressIndicator());
+                      if (loading == null) {
+                        // Image is loaded, set loading state to false
+                        if (_mediaLoading) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            setState(() => _mediaLoading = false);
+                          });
+                        }
+                        return child;
+                      }
+                      
+                      // Image is loading, show progress
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loading.expectedTotalBytes != null
+                              ? loading.cumulativeBytesLoaded / loading.expectedTotalBytes!
+                              : null, // Indeterminate progress if total bytes is unknown
+                        ),
+                      );
                     },
-                    // ⭐ Ensure errorBuilder is only for images and reports a generic issue
                     errorBuilder: (context, _, __) => const Center(
                       child: Text(
                         "Cannot display image or non-video file type.",
