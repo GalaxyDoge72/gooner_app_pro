@@ -321,6 +321,9 @@ class _ImageScreenState extends State<ImageScreen> {
           SnackBar(content: Text('Download failed: $e')),
         );
       }
+      else {
+        
+      }
     } finally {
       setState(() => _downloading = false);
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gooner_app_pro/screens/coomerst_screen.dart';
 import 'package:gooner_app_pro/screens/e621_screen.dart';
 import 'package:gooner_app_pro/screens/kemonocr_screen.dart';
 import 'package:gooner_app_pro/screens/rule34_screen.dart';
@@ -30,7 +31,7 @@ final List<IconItem> fakeProviders = [
 
 // Placeholder list for the hidden "Real" content providers
 final List<IconItem> realProviders = [
-  
+  IconItem(iconPath: "assets/placeholder_logo.png", label: "coomer.st", targetScreen: CoomerStScreen())
 ];
 
 
