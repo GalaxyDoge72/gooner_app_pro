@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/material.dart';
 // import 'package:video_player/video_player.dart'; // REMOVED
@@ -173,13 +174,23 @@ class _ImageScreenState extends State<ImageScreen> {
     if (useShareSheet) {
       final dir = await getTemporaryDirectory();
       saveDir = dir.path;
+    } else {
+      try {
+        // This returns a String? (nullable string)
+        saveDir = await FilePicker.platform.getDirectoryPath();
+      } catch (e) {
+        log('Caught exception $e');
+      }
     }
-    else {
-      saveDir = await FilePicker.platform.getDirectoryPath();
-      if (saveDir == null) {
-        setState(() =>  _downloading = false);
-        return;
-      } 
+
+    // ⭐ CRITICAL FIX: Check if the user cancelled the directory picker
+    if (saveDir == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Download cancelled by user.')),
+        );
+      }
+      return; // Stop the download process and skip the rest of the method
     }
 
     // 2️⃣ Stream the download
@@ -208,6 +219,7 @@ class _ImageScreenState extends State<ImageScreen> {
       }
     }
 
+    // saveDir is guaranteed to be non-null here
     final filePath = '$saveDir/$fileName';
     final file = File(filePath);
     final total = response.contentLength ?? -1;
@@ -216,6 +228,7 @@ class _ImageScreenState extends State<ImageScreen> {
     final stopwatch = Stopwatch()..start();
 
     await for (final chunk in response.stream) {
+      // ... (rest of download logic) ...
       sink.add(chunk);
       received += chunk.length;
 
