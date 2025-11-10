@@ -257,7 +257,6 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerPr
   Widget _buildMediaTab() {
     if (_postDetails == null) return const Center(child: Text('No media available.'));
     
-    // Combine main file and attachments into one list
     final allFiles = [
       if (_postDetails!.mainFile != null) _postDetails!.mainFile!,
       ..._postDetails!.attachments,
@@ -273,26 +272,23 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerPr
         final isMainFile = file == _postDetails!.mainFile;
         
         return ListTile(
-          // ⭐ MODIFIED: Use Image.network for a thumbnail preview
-          leading: SizedBox(
-            width: 50,
-            height: 50,
-            child: isMedia 
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(4.0),
-                    child: Image.network(
-                      file.fullUrl,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                      },
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Center(child: Icon(Icons.broken_image, size: 24)),
-                    ),
-                  )
-                : Icon(Icons.attach_file),
-          ),
+  leading: SizedBox(
+    width: 50,
+    height: 50,
+    child: Center( // Use Center to ensure the icon is vertically and horizontally centered in the 50x50 box
+      child: isMedia 
+          ? const Icon(
+              Icons.image, // Icon used if it's a media post (image/video)
+              size: 32, 
+              color: Colors.blueGrey,
+            )
+          : const Icon(
+              Icons.attach_file, // Icon used if it's a generic file attachment
+              size: 28, 
+              color: Colors.grey,
+            ),
+    ),
+  ),
           
           title: Text(file.name),
           subtitle: Text(isMainFile ? 'Main File (Tap to view media)' : 'Attachment (Tap to view media)'),

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/material.dart';
-// import 'package:video_player/video_player.dart'; // REMOVED
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 
@@ -11,7 +10,7 @@ import '../models/danbooru_post.dart';
 import '../models/e621_post.dart';
 import '../models/tags_object.dart';
 
-// New imports for iOS Media players //
+// New imports for media players //
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path_provider/path_provider.dart';
@@ -20,7 +19,7 @@ import 'package:share_plus/share_plus.dart';
 
 class ImageScreen extends StatefulWidget {
   final dynamic post;
-  final String? source; // "Rule34", "Danbooru", "e621"
+  final String? source; // "Rule34", "Danbooru", "e621", "Kemono.cr"
   final String? userId;
   final String? apiKey;
 
@@ -42,29 +41,39 @@ class _ImageScreenState extends State<ImageScreen> {
   late bool isWebm;
   late String tagsText;
 
-  // VideoPlayerController? _videoController; // REMOVED
   bool _downloading = false;
   double _progress = 0.0;
   String _speed = "Starting...";
 
-  // Controllers are now used for ALL platforms //
+  // MediaKit Controllers
   Player? _player;
   VideoController? _videoKitController;
+  String? _mediaError; // ⭐ NEW: State variable to store media player error
 
   @override
   void initState() {
     super.initState();
 
-    // Initialize media_kit players unconditionally for all platforms
+    // Initialize media_kit players
     _player = Player();
     _videoKitController = VideoController(_player!);
+
+    // ⭐ NEW: Subscribe to the error stream to capture playback issues
+    _player!.stream.error.listen((error) {
+      if (mounted) {
+        // Update state with the error message when an error occurs
+        setState(() {
+          log('MediaKit Error: $error');
+          _mediaError = 'Playback Error: $error. Check URL or Codec.';
+        });
+      }
+    });
 
     _setupMedia();
   }
 
   @override
   void dispose() {
-    // _videoController?.dispose(); // REMOVED
     _player?.dispose();
     super.dispose();
   }
@@ -75,7 +84,7 @@ class _ImageScreenState extends State<ImageScreen> {
     // Determine type and URL
     if (post is R34Post) {
       fileUrl = post.fileUrl ?? '';
-      isVideo = post.isVideo;
+      isVideo = post.isVideo || post.isWebmVideo; // Check for any video type
       isWebm = post.isWebmVideo;
       tagsText = _extractR34Tags(post);
     } else if (post is DanbooruPost) {
@@ -97,7 +106,7 @@ class _ImageScreenState extends State<ImageScreen> {
 
     final authUrl = _buildAuthenticatedUrl(fileUrl);
 
-    if (isVideo) {
+    if (isVideo && authUrl.isNotEmpty) {
       // Use media_kit for ALL platforms, replacing the conditional logic
       await _player!.open(Media(authUrl));
       _player!.setPlaylistMode(PlaylistMode.loop);
@@ -117,13 +126,21 @@ class _ImageScreenState extends State<ImageScreen> {
         widget.userId != null) {
       return '$url?api_key=${Uri.encodeComponent(widget.apiKey!)}&user=${Uri.encodeComponent(widget.userId!)}';
     }
+    // No specific auth for Kemono.cr or generic posts needed here
     return url;
   }
 
   String _extractR34Tags(R34Post post) {
     final tags = post.parsedTags;
     if (tags.isEmpty) return 'No tags available.';
-    return 'Source: Rule34 | Post ID: ${post.id}\n\n${tags.join(", ")}';
+    
+    // Check if the post has Kemono-specific metadata (authUserId and authApiKey were re-used for creatorId and service)
+    String sourceInfo = 'Source: Rule34';
+    if (widget.source == 'Kemono.cr') {
+      sourceInfo = 'Source: Kemono.cr (${post.authApiKey ?? 'N/A'} / ${post.authUserId ?? 'N/A'})';
+    }
+    
+    return '$sourceInfo | Post ID: ${post.id}\n\n${tags.join(", ")}';
   }
 
   String _extractDanbooruTags(DanbooruPost post) {
@@ -158,113 +175,111 @@ class _ImageScreenState extends State<ImageScreen> {
   }
 
   Future<void> _downloadFile() async {
-  final url = _buildAuthenticatedUrl(fileUrl);
-  final uri = Uri.parse(url);
+    final url = _buildAuthenticatedUrl(fileUrl);
+    final uri = Uri.parse(url);
 
-  setState(() {
-    _downloading = true;
-    _progress = 0;
-    _speed = "Starting...";
-  });
+    setState(() {
+      _downloading = true;
+      _progress = 0;
+      _speed = "Starting...";
+    });
 
-  try {
-    String? saveDir;
-    bool useShareSheet = Platform.isIOS;
+    try {
+      String? saveDir;
+      bool useShareSheet = Platform.isIOS;
 
-    if (useShareSheet) {
-      final dir = await getTemporaryDirectory();
-      saveDir = dir.path;
-    } else {
-      try {
-        // This returns a String? (nullable string)
-        saveDir = await FilePicker.platform.getDirectoryPath();
-      } catch (e) {
-        log('Caught exception $e');
+      if (useShareSheet) {
+        final dir = await getTemporaryDirectory();
+        saveDir = dir.path;
+      } else {
+        try {
+          // This returns a String? (nullable string)
+          saveDir = await FilePicker.platform.getDirectoryPath();
+        } catch (e) {
+          log('Caught exception $e');
+        }
       }
-    }
 
-    // ⭐ CRITICAL FIX: Check if the user cancelled the directory picker
-    if (saveDir == null) {
+      if (saveDir == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Download cancelled by user.')),
+          );
+        }
+        return;
+      }
+
+      // 2️⃣ Stream the download
+      final request = http.Request('GET', uri);
+      final response = await http.Client().send(request);
+
+      // Determine filename and fallback extension
+      String fileName =
+          uri.pathSegments.isNotEmpty ? uri.pathSegments.last : 'download';
+      final contentType = response.headers['content-type'] ?? '';
+
+      // 3️⃣ Append file extension if missing
+      if (!fileName.contains('.')) {
+        if (contentType.contains('video/webm')) {
+          fileName += '.webm';
+        } else if (contentType.contains('video/mp4')) {
+          fileName += '.mp4';
+        } else if (contentType.contains('image/jpeg')) {
+          fileName += '.jpg';
+        } else if (contentType.contains('image/png')) {
+          fileName += '.png';
+        } else if (contentType.contains('image/gif')) {
+          fileName += '.gif';
+        } else {
+          fileName += '.bin';
+        }
+      }
+
+      // saveDir is guaranteed to be non-null here
+      final filePath = '$saveDir/$fileName';
+      final file = File(filePath);
+      final total = response.contentLength ?? -1;
+      var received = 0;
+      final sink = file.openWrite();
+      final stopwatch = Stopwatch()..start();
+
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
+        received += chunk.length;
+
+        if (total > 0) {
+          final progress = received / total;
+          final speed = received / (stopwatch.elapsedMilliseconds / 1000 + 0.001);
+          setState(() {
+            _progress = progress;
+            _speed = _formatSpeed(speed);
+          });
+        }
+      }
+
+      await sink.close();
+      stopwatch.stop();
+
+      if (useShareSheet) {
+        final xfile = XFile(filePath, name: fileName);
+        await Share.shareXFiles([xfile], text: 'Downloaded: $fileName');
+      }
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Download cancelled by user.')),
+          SnackBar(content: Text('Downloaded: $fileName')),
         );
       }
-      return; // Stop the download process and skip the rest of the method
-    }
-
-    // 2️⃣ Stream the download
-    final request = http.Request('GET', uri);
-    final response = await http.Client().send(request);
-
-    // Determine filename and fallback extension
-    String fileName =
-        uri.pathSegments.isNotEmpty ? uri.pathSegments.last : 'download';
-    final contentType = response.headers['content-type'] ?? '';
-
-    // 3️⃣ Append file extension if missing
-    if (!fileName.contains('.')) {
-      if (contentType.contains('video/webm')) {
-        fileName += '.webm';
-      } else if (contentType.contains('video/mp4')) {
-        fileName += '.mp4';
-      } else if (contentType.contains('image/jpeg')) {
-        fileName += '.jpg';
-      } else if (contentType.contains('image/png')) {
-        fileName += '.png';
-      } else if (contentType.contains('image/gif')) {
-        fileName += '.gif';
-      } else {
-        fileName += '.bin';
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: $e')),
+        );
       }
+    } finally {
+      setState(() => _downloading = false);
     }
-
-    // saveDir is guaranteed to be non-null here
-    final filePath = '$saveDir/$fileName';
-    final file = File(filePath);
-    final total = response.contentLength ?? -1;
-    var received = 0;
-    final sink = file.openWrite();
-    final stopwatch = Stopwatch()..start();
-
-    await for (final chunk in response.stream) {
-      // ... (rest of download logic) ...
-      sink.add(chunk);
-      received += chunk.length;
-
-      if (total > 0) {
-        final progress = received / total;
-        final speed = received / (stopwatch.elapsedMilliseconds / 1000 + 0.001);
-        setState(() {
-          _progress = progress;
-          _speed = _formatSpeed(speed);
-        });
-      }
-    }
-
-    await sink.close();
-    stopwatch.stop();
-
-    if (useShareSheet) {
-      final xfile = XFile(filePath, name: fileName);
-      await Share.shareXFiles([xfile], text: 'Downloaded: $fileName');
-    }
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Downloaded: $fileName')),
-      );
-    }
-  } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Download failed: $e')),
-      );
-    }
-  } finally {
-    setState(() => _downloading = false);
   }
-}
 
   String _formatSpeed(double bytesPerSecond) {
     if (bytesPerSecond < 1024) return '${bytesPerSecond.toStringAsFixed(2)} B/s';
@@ -280,8 +295,7 @@ class _ImageScreenState extends State<ImageScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        // ... (AppBar is unchanged) ...
-        title: const Text('Image Details'),
+        title: const Text('Image/Media Details'),
         actions: [
           IconButton(
             icon: const Icon(Icons.download),
@@ -292,30 +306,42 @@ class _ImageScreenState extends State<ImageScreen> {
       body: Stack(
         children: [
           Center(
-            child: isVideo
-                // MODIFIED: Always use the media_kit Video widget for video playback
-                ? Video( 
-                    controller: _videoKitController!,
-                    fit: BoxFit.contain,
+            child: isVideo 
+                ? (_mediaError != null
+                    // ⭐ Display error message if playback failed
+                    ? Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Text(
+                          _mediaError!,
+                          style: const TextStyle(color: Colors.red, fontSize: 18),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    // Otherwise, show the video player
+                    : Video(
+                        controller: _videoKitController!,
+                        fit: BoxFit.contain,
+                      )
                   )
                 : Image.network(
                     authUrl,
                     fit: BoxFit.contain,
-                    // ... (Image.network logic is unchanged) ...
                     loadingBuilder: (context, child, loading) {
                       if (loading == null) return child;
                       return const Center(child: CircularProgressIndicator());
                     },
+                    // ⭐ Ensure errorBuilder is only for images and reports a generic issue
                     errorBuilder: (context, _, __) => const Center(
                       child: Text(
-                        "Cannot display image or unsupported WebM.",
+                        "Cannot display image or non-video file type.",
                         style: TextStyle(color: Colors.white),
                         textAlign: TextAlign.center,
                       ),
                     ),
                   ),
           ),
-          // ... (Rest of your Stack children for progress, tags, etc. are unchanged) ...
+          
+          // --- Download Progress Overlay ---
           if (_downloading)
             Positioned(
               top: 20,
@@ -335,6 +361,8 @@ class _ImageScreenState extends State<ImageScreen> {
                 ),
               ),
             ),
+            
+          // --- Show Tags Button ---
           Positioned(
             bottom: 80,
             right: 20,
@@ -359,6 +387,8 @@ class _ImageScreenState extends State<ImageScreen> {
               child: const Text('Show Tags'),
             ),
           ),
+          
+          // --- Show Comments Button ---
           Positioned(
             bottom: 20,
             right: 20,
