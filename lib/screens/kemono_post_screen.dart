@@ -5,7 +5,12 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// --- Helper Models (Unchanged) ---
+// Assuming R34Post and ImageScreen are available via relative imports
+import '../models/r34_post.dart'; 
+import 'image_screen.dart'; 
+
+// --- Helper Models ---
+
 class FileAttachment {
   final String name;
   final String path;
@@ -31,7 +36,6 @@ class KemonoPostDetails {
     this.mainFile,
   });
 
-  // This factory method correctly parses the structure of the *nested* post object.
   factory KemonoPostDetails.fromJson(Map<String, dynamic> json, String apiBaseUrl) {
     // 1. Parse main file
     final mainFileJson = json['file'];
@@ -66,7 +70,7 @@ class KemonoPostDetails {
 }
 
 
-// --- Post Detail Screen ---
+// --- Post Detail Screen with Tabs ---
 
 class KemonoPostScreen extends StatefulWidget {
   final String postId;
@@ -87,21 +91,24 @@ class KemonoPostScreen extends StatefulWidget {
   State<KemonoPostScreen> createState() => _KemonoPostScreenState();
 }
 
-class _KemonoPostScreenState extends State<KemonoPostScreen> {
+class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerProviderStateMixin {
   KemonoPostDetails? _postDetails;
   bool _isLoading = true;
   String? _error;
   final http.Client _httpClient = http.Client();
+  late TabController _tabController; 
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this); 
     _fetchPostDetails();
   }
   
   @override
   void dispose() {
     _httpClient.close();
+    _tabController.dispose(); 
     super.dispose();
   }
 
@@ -137,7 +144,7 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> {
       if (response.statusCode == 200) {
         final Map<String, dynamic> rawJsonResponse = jsonDecode(response.body);
         
-        // ⭐ FIX: Extract the nested "post" object from the root JSON
+        // FIX: Extract the nested "post" object from the root JSON
         final Map<String, dynamic>? postJson = rawJsonResponse['post'];
         
         if (postJson == null) {
@@ -152,7 +159,6 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> {
         log("KemonoPostScreen SUCCESS: Parsed post details for '${postJson['title']}'");
         
         setState(() {
-          // Pass the NECESSARY nested object to the parser
           _postDetails = KemonoPostDetails.fromJson(postJson, widget.apiBaseUrl); 
           _isLoading = false;
         });
@@ -184,84 +190,146 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> {
       }
     }
   }
+  
+  // NEW: Media tap handler
+  void _onMediaTapped(BuildContext context, FileAttachment attachment) {
+    final fakePost = R34Post(
+      id: widget.postId, // Use the main post ID
+      fileUrl: attachment.fullUrl,
+      previewUrl: attachment.fullUrl, 
+      tagsString: 'Attachment: ${attachment.name} (${widget.service} Post ${widget.postId})',
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ImageScreen(
+          post: fakePost,
+          source: 'Kemono.cr Media', 
+        ),
+      ),
+    );
+  }
+
+  // NEW: Content Tab Widget
+  Widget _buildContentTab() {
+    if (_postDetails == null) return const Center(child: Text('No content available.'));
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // --- Title & Metadata ---
+          Text(
+            _postDetails!.title,
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Published: ${_postDetails!.published}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const Divider(),
+
+          // --- Main Content (HTML) ---
+          Text(
+            'Content:',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          HtmlWidget(
+            _postDetails!.content,
+            onTapUrl: (url) async {
+              _launchUrl(url);
+              return true;
+            },
+            textStyle: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ... (rest of KemonoPostScreenState remains the same)
+
+  // NEW: Media Tab Widget
+  Widget _buildMediaTab() {
+    if (_postDetails == null) return const Center(child: Text('No media available.'));
+    
+    // Combine main file and attachments into one list
+    final allFiles = [
+      if (_postDetails!.mainFile != null) _postDetails!.mainFile!,
+      ..._postDetails!.attachments,
+    ];
+
+    if (allFiles.isEmpty) return const Center(child: Text('No files or attachments found for this post.'));
+
+    return ListView(
+      padding: const EdgeInsets.all(8.0),
+      children: allFiles.map((file) {
+        // Simple check to determine if it's likely an image or video
+        final isMedia = file.fullUrl.toLowerCase().contains(RegExp(r'\.(jpe?g|png|gif|mp4|webm|mov)'));
+        final isMainFile = file == _postDetails!.mainFile;
+        
+        return ListTile(
+          // ⭐ MODIFIED: Use Image.network for a thumbnail preview
+          leading: SizedBox(
+            width: 50,
+            height: 50,
+            child: isMedia 
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(4.0),
+                    child: Image.network(
+                      file.fullUrl,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                      },
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Center(child: Icon(Icons.broken_image, size: 24)),
+                    ),
+                  )
+                : Icon(Icons.attach_file),
+          ),
+          // ⭐ END MODIFICATION
+          
+          title: Text(file.name),
+          subtitle: Text(isMainFile ? 'Main File (Tap to view media)' : 'Attachment (Tap to view media)'),
+          trailing: IconButton(
+            icon: const Icon(Icons.open_in_new),
+            onPressed: () => _launchUrl(file.fullUrl), // Open original URL in browser
+          ),
+          onTap: () => _onMediaTapped(context, file), // Open in ImageScreen
+        );
+      }).toList(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(_postDetails?.title ?? 'Post Details'),
+        bottom: TabBar( 
+          controller: _tabController,
+          tabs: const [
+            Tab(icon: Icon(Icons.article), text: 'Content'),
+            Tab(icon: Icon(Icons.perm_media), text: 'Media'),
+          ],
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Text(_error!))
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // --- Title & Metadata ---
-                      Text(
-                        _postDetails!.title,
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Published: ${_postDetails!.published}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const Divider(),
-
-                      // --- Main Content (HTML) ---
-                      Text(
-                        'Content:',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      // The content often contains line breaks (\n\n) but not always HTML tags. 
-                      // HtmlWidget handles both basic text and potential HTML elements.
-                      HtmlWidget(
-                        _postDetails!.content,
-                        onTapUrl: (url) async {
-                          _launchUrl(url);
-                          return true;
-                        },
-                        textStyle: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const Divider(),
-
-                      // --- Main File ---
-                      if (_postDetails!.mainFile != null) ...[
-                        Text(
-                          'Main File:',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        ListTile(
-                          leading: const Icon(Icons.download),
-                          title: Text(_postDetails!.mainFile!.name),
-                          subtitle: const Text('Tap to open in browser'),
-                          onTap: () => _launchUrl(_postDetails!.mainFile!.fullUrl),
-                        ),
-                        const Divider(),
-                      ],
-
-                      // --- Attachments ---
-                      if (_postDetails!.attachments.isNotEmpty) ...[
-                        Text(
-                          'Attachments (${_postDetails!.attachments.length}):',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        ..._postDetails!.attachments.map((file) => ListTile(
-                              leading: const Icon(Icons.attach_file),
-                              title: Text(file.name),
-                              subtitle: const Text('Tap to open in browser'),
-                              onTap: () => _launchUrl(file.fullUrl),
-                            )),
-                      ],
-                    ],
-                  ),
+              : TabBarView( 
+                  controller: _tabController,
+                  children: [
+                    _buildContentTab(), 
+                    _buildMediaTab(),  
+                  ],
                 ),
     );
   }
