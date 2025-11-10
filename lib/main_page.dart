@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gooner_app_pro/screens/e621_screen.dart';
+import 'package:gooner_app_pro/screens/kemonocr_screen.dart';
 import 'package:gooner_app_pro/screens/rule34_screen.dart';
 import 'package:gooner_app_pro/screens/danbooru_screen.dart';
 import 'package:provider/provider.dart';
@@ -23,7 +24,9 @@ final List<IconItem> fakeProviders = [
   IconItem(iconPath: "assets/e621_logo.png", label: "e621.net", targetScreen: E621Screen()),
   IconItem(iconPath: "assets/rule34_logo.png", label: "rule34.xxx", targetScreen: const Rule34Screen()),
   IconItem(iconPath: "assets/waifu_pics_logo.png", label: "waifu.pics", targetScreen: WaifuPicsScreen()),
-  IconItem(iconPath: "assets/waifu_im_logo.png", label: "waifu.im", targetScreen: WaifuImScreen())
+  IconItem(iconPath: "assets/waifu_im_logo.png", label: "waifu.im", targetScreen: WaifuImScreen()),
+  IconItem(iconPath: "assets/placeholder_logo.png", label: "kemono.cr", targetScreen: KemonoCrScreen())
+  // Disabled until kemono.cr fixes their fuckin API
 ];
 
 // Placeholder list for the hidden "Real" content providers
