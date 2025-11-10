@@ -26,7 +26,6 @@ final List<IconItem> fakeProviders = [
   IconItem(iconPath: "assets/waifu_pics_logo.png", label: "waifu.pics", targetScreen: WaifuPicsScreen()),
   IconItem(iconPath: "assets/waifu_im_logo.png", label: "waifu.im", targetScreen: WaifuImScreen()),
   IconItem(iconPath: "assets/placeholder_logo.png", label: "kemono.cr", targetScreen: KemonoCrScreen())
-  // Disabled until kemono.cr fixes their fuckin API
 ];
 
 // Placeholder list for the hidden "Real" content providers

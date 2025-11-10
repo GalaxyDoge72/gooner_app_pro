@@ -293,7 +293,6 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerPr
                   )
                 : Icon(Icons.attach_file),
           ),
-          // ⭐ END MODIFICATION
           
           title: Text(file.name),
           subtitle: Text(isMainFile ? 'Main File (Tap to view media)' : 'Attachment (Tap to view media)'),
