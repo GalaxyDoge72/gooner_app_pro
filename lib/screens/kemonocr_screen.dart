@@ -237,6 +237,7 @@ class _KemonoCrScreenState extends State<KemonoCrScreen> with SingleTickerProvid
   Future<void> _fetchTagSearchPosts({bool clearPrevious = false}) async {
     final String query = _tagSearchController.text.trim();
 
+    // Check if loading or query is empty
     if (_tagSearchLoading || query.isEmpty) {
       if (query.isEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -328,13 +329,15 @@ class _KemonoCrScreenState extends State<KemonoCrScreen> with SingleTickerProvid
           setState(() => _popularError = 'Network/Parsing Error');
       }
     } finally {
-      setState(() {
-        if (isPopularFeed) {
-          _popularLoading = false;
-        } else {
-          _isLoading = false;
-        }
-      });
+      if(mounted) { // Ensure widget is still mounted before final setState
+        setState(() {
+          if (isPopularFeed) {
+            _popularLoading = false;
+          } else {
+            _isLoading = false;
+          }
+        });
+      }
     }
   }
 
@@ -362,24 +365,32 @@ Future<void> _performGlobalFetch(Uri uri) async {
           .toList();
       // ⭐ FIX END
 
-      setState(() {
-        _tagSearchPosts.addAll(newPosts);
-        _tagSearchCurrentPage++;
-        _tagSearchHasMore = newPosts.isNotEmpty;
-      });
+      if(mounted) {
+        setState(() {
+          _tagSearchPosts.addAll(newPosts);
+          _tagSearchCurrentPage++;
+          _tagSearchHasMore = newPosts.isNotEmpty;
+        });
+      }
     } else {
-      // ... (HTTP error handling)
+      log('HTTP Error (Global): ${response.statusCode} - ${response.body}');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Error fetching global posts: ${response.statusCode}')));
+      }
     }
   } catch (e, stack) {
-    log('Fetch Error: $e\n$stack');
+    log('Fetch Error (Global): $e\n$stack');
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('A network or parsing error occurred.')));
     }
   } finally {
-    setState(() {
-      _tagSearchLoading = false;
-    });
+    if(mounted) {
+      setState(() {
+        _tagSearchLoading = false;
+      });
+    }
   }
 }
 
@@ -840,25 +851,31 @@ Future<void> _performGlobalFetch(Uri uri) async {
             ),
             itemCount: _tagSearchPosts.length,
             itemBuilder: (context, index) {
-  // Safety check (redundant if itemCount is correct, but safe)
-  if (index >= _tagSearchPosts.length) {
-    return const SizedBox.shrink(); // Should not happen
-  }
-  
-  final post = _tagSearchPosts[index]; // Now protected
+              // Safety check
+              if (index >= _tagSearchPosts.length) {
+                return const SizedBox.shrink(); // Should not happen
+              }
+              
+              final post = _tagSearchPosts[index];
 
-  // Load more logic (always check length before accessing index - 1)
-  if (_tagSearchPosts.length > 0 && index == _tagSearchPosts.length - 1 && !_tagSearchLoading && _tagSearchHasMore) {
-    _fetchTagSearchPosts(clearPrevious: false);
-  }
+              // ⭐ FIX: Defer the setState call
+              if (_tagSearchPosts.isNotEmpty && index == _tagSearchPosts.length - 1 && !_tagSearchLoading && _tagSearchHasMore) {
+                // We cannot call _fetchTagSearchPosts directly during a build.
+                // Schedule it to run right *after* the build is complete.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) { // Check if the widget is still in the tree
+                    _fetchTagSearchPosts(clearPrevious: false);
+                  }
+                });
+              }
 
-  final imageUrl = post.previewUrl;
+              final imageUrl = post.previewUrl;
 
-  return GestureDetector(
-    onTap: () => _onPostTapped(context, post),
-    child: _buildPostTile(post, imageUrl),
-  );
-},
+              return GestureDetector(
+                onTap: () => _onPostTapped(context, post),
+                child: _buildPostTile(post, imageUrl),
+              );
+            },
           ),
         ),
 

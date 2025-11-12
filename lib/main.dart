@@ -1,11 +1,11 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:gooner_app_pro/screens/image_screen.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';
 import 'main_page.dart';
-import 'screens/settings_screen.dart'; // Import the SettingsScreen
+import 'screens/settings_screen.dart'; 
 import 'services/settings_service.dart';
-// <-- Add this line
 
 void main() async {
   // Ensure Flutter is initialized before accessing SharedPreferences
@@ -15,8 +15,8 @@ void main() async {
   final settingsService = SettingsService();
   await settingsService.loadSettings();
 
-  WidgetsFlutterBinding.ensureInitialized();
-  MediaKit.ensureInitialized();
+  MediaKit.ensureInitialized(); 
+  
   runApp(MainApp(settingsService: settingsService));
 }
 

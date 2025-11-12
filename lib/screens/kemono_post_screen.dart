@@ -9,15 +9,18 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/r34_post.dart'; 
 import 'image_screen.dart'; 
 
+// Import for the download service
+import 'package:gooner_app_pro/services/download_service.dart';
+// Import for the new audio screen
+import 'audio_screen.dart'; 
+
+// ⭐ NEW: Import the central FileAttachment model
+import '../models/file_attachment.dart';
+
+
 // --- Helper Models ---
 
-class FileAttachment {
-  final String name;
-  final String path;
-  final String fullUrl;
-
-  FileAttachment({required this.name, required this.path, required this.fullUrl});
-}
+// ⭐ DELETED: The local FileAttachment class definition was removed from here.
 
 class KemonoPostDetails {
   final String id;
@@ -98,6 +101,11 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerPr
   final http.Client _httpClient = http.Client();
   late TabController _tabController; 
 
+  // State variables for download management
+  bool _isDownloadingMedia = false;
+  double _downloadProgress = 0.0;
+  String _downloadSpeed = "Starting...";
+
   @override
   void initState() {
     super.initState();
@@ -144,7 +152,6 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerPr
       if (response.statusCode == 200) {
         final Map<String, dynamic> rawJsonResponse = jsonDecode(response.body);
         
-        // FIX: Extract the nested "post" object from the root JSON
         final Map<String, dynamic>? postJson = rawJsonResponse['post'];
         
         if (postJson == null) {
@@ -190,8 +197,44 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerPr
       }
     }
   }
+
+  Future<void> _downloadFile(FileAttachment file, GlobalKey buttonKey) async {
+    if (_isDownloadingMedia) return; 
+
+    const String source = 'Kemono.cr'; 
+
+    await DownloadService.downloadAndShareFile(
+      fileUrl: file.fullUrl,
+      source: source, 
+      userId: null,
+      apiKey: null,
+      context: context,
+      buttonKey: buttonKey,
+      onStart: () {
+        setState(() {
+          _isDownloadingMedia = true;
+          _downloadProgress = 0;
+          _downloadSpeed = "Starting...";
+        });
+      },
+      onProgress: (progress, speed) {
+        setState(() {
+          _downloadProgress = progress;
+          _downloadSpeed = speed;
+        });
+      },
+      onComplete: (success, message) {
+        setState(() => _isDownloadingMedia = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message)),
+          );
+        }
+      }
+    );
+  }
   
-  // NEW: Media tap handler
+  // Media tap handler for Images/Videos (goes to ImageScreen)
   void _onMediaTapped(BuildContext context, FileAttachment attachment) {
     final fakePost = R34Post(
       id: widget.postId, // Use the main post ID
@@ -211,7 +254,19 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerPr
     );
   }
 
-  // NEW: Content Tab Widget
+  // Media tap handler for Audio (goes to AudioScreen)
+  void _onAudioTapped(BuildContext context, FileAttachment attachment) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AudioScreen(
+          attachment: attachment,
+        ),
+      ),
+    );
+  }
+
+  // Content Tab Widget
   Widget _buildContentTab() {
     if (_postDetails == null) return const Center(child: Text('No content available.'));
     
@@ -220,7 +275,6 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerPr
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- Title & Metadata ---
           Text(
             _postDetails!.title,
             style: Theme.of(context).textTheme.headlineMedium,
@@ -231,8 +285,6 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerPr
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const Divider(),
-
-          // --- Main Content (HTML) ---
           Text(
             'Content:',
             style: Theme.of(context).textTheme.titleLarge,
@@ -251,9 +303,7 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerPr
     );
   }
 
-  // ... (rest of KemonoPostScreenState remains the same)
-
-  // NEW: Media Tab Widget
+  // Media Tab Widget
   Widget _buildMediaTab() {
     if (_postDetails == null) return const Center(child: Text('No media available.'));
     
@@ -267,36 +317,80 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerPr
     return ListView(
       padding: const EdgeInsets.all(8.0),
       children: allFiles.map((file) {
-        // Simple check to determine if it's likely an image or video
-        final isMedia = file.fullUrl.toLowerCase().contains(RegExp(r'\.(jpe?g|png|gif|mp4|webm|mov)'));
-        final isMainFile = file == _postDetails!.mainFile;
+        final String lowerUrl = file.fullUrl.toLowerCase();
+        
+        final bool isVideo = lowerUrl.contains(RegExp(r'\.(mp4|webm|mov|mkv)$'));
+        final bool isImage = lowerUrl.contains(RegExp(r'\.(jpe?g|png|gif|webp)$'));
+        final bool isAudio = lowerUrl.contains(RegExp(r'\.(mp3|wav|ogg|m4a|flac)$'));
+        
+        final bool isMainFile = file == _postDetails!.mainFile;
+        final GlobalKey buttonKey = GlobalKey();
+
+        IconData fileIcon;
+        Color fileIconColor = Colors.blueGrey;
+        if (isImage) {
+          fileIcon = Icons.image;
+        } else if (isVideo) {
+          fileIcon = Icons.videocam;
+        } else if (isAudio) {
+          fileIcon = Icons.audiotrack;
+          fileIconColor = Colors.deepPurple;
+        } else {
+          fileIcon = Icons.attach_file;
+          fileIconColor = Colors.grey;
+        }
+
+        String subtitle;
+        if (isAudio) {
+          subtitle = isMainFile ? 'Main File (Tap to play audio)' : 'Attachment (Tap to play audio)';
+        } else if (isImage || isVideo) {
+          subtitle = isMainFile ? 'Main File (Tap to view media)' : 'Attachment (Tap to view media)';
+        } else {
+          subtitle = isMainFile ? 'Main File (Tap to open)' : 'Attachment (Tap to open)';
+        }
         
         return ListTile(
-  leading: SizedBox(
-    width: 50,
-    height: 50,
-    child: Center( // Use Center to ensure the icon is vertically and horizontally centered in the 50x50 box
-      child: isMedia 
-          ? const Icon(
-              Icons.image, // Icon used if it's a media post (image/video)
-              size: 32, 
-              color: Colors.blueGrey,
-            )
-          : const Icon(
-              Icons.attach_file, // Icon used if it's a generic file attachment
-              size: 28, 
-              color: Colors.grey,
+          leading: SizedBox(
+            width: 50,
+            height: 50,
+            child: Center(
+              child: Icon(
+                fileIcon,
+                size: 32, 
+                color: fileIconColor,
+              ),
             ),
-    ),
-  ),
+          ),
           
           title: Text(file.name),
-          subtitle: Text(isMainFile ? 'Main File (Tap to view media)' : 'Attachment (Tap to view media)'),
-          trailing: IconButton(
-            icon: const Icon(Icons.open_in_new),
-            onPressed: () => _launchUrl(file.fullUrl), // Open original URL in browser
+          subtitle: Text(subtitle),
+          
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                key: buttonKey,
+                icon: const Icon(Icons.download),
+                tooltip: 'Download',
+                onPressed: _isDownloadingMedia ? null : () => _downloadFile(file, buttonKey), 
+              ),
+              IconButton(
+                icon: const Icon(Icons.open_in_new),
+                tooltip: 'Open in browser',
+                onPressed: () => _launchUrl(file.fullUrl),
+              ),
+            ],
           ),
-          onTap: () => _onMediaTapped(context, file), // Open in ImageScreen
+          
+          onTap: () {
+            if (isImage || isVideo) {
+              _onMediaTapped(context, file); // Open in ImageScreen
+            } else if (isAudio) {
+              _onAudioTapped(context, file); // Open in AudioScreen
+            } else {
+              _launchUrl(file.fullUrl); // Fallback for other files
+            }
+          },
         );
       }).toList(),
     );
@@ -304,6 +398,21 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
+    Widget bodyContent;
+    if (_isLoading) {
+      bodyContent = const Center(child: CircularProgressIndicator());
+    } else if (_error != null) {
+      bodyContent = Center(child: Text(_error!));
+    } else {
+      bodyContent = TabBarView( 
+        controller: _tabController,
+        children: [
+          _buildContentTab(), 
+          _buildMediaTab(),  
+        ],
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_postDetails?.title ?? 'Post Details'),
@@ -315,17 +424,35 @@ class _KemonoPostScreenState extends State<KemonoPostScreen> with SingleTickerPr
           ],
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(child: Text(_error!))
-              : TabBarView( 
-                  controller: _tabController,
+      body: Stack(
+        children: [
+          bodyContent, 
+          
+          if (_isDownloadingMedia)
+            Positioned(
+              top: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildContentTab(), 
-                    _buildMediaTab(),  
+                    Text(_downloadSpeed, style: const TextStyle(color: Colors.white)),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: 150,
+                      child: LinearProgressIndicator(value: _downloadProgress),
+                    ),
                   ],
                 ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

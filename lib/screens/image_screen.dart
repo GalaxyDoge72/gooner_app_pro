@@ -1,9 +1,7 @@
 import 'dart:async';
 import 'dart:developer';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart' as http;
+import 'package:gooner_app_pro/services/download_service.dart';
 
 import '../models/r34_post.dart';
 import '../models/danbooru_post.dart';
@@ -13,8 +11,6 @@ import '../models/tags_object.dart';
 // New imports for media players //
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 
 class ImageScreen extends StatefulWidget {
@@ -212,122 +208,39 @@ class _ImageScreenState extends State<ImageScreen> {
   }
 
   Future<void> _downloadFile() async {
-    final url = _buildAuthenticatedUrl(fileUrl);
-    final uri = Uri.parse(url);
+  if (_downloading) return;
 
-    setState(() {
-      _downloading = true;
-      _progress = 0;
-      _speed = "Starting...";
-    });
-
-    try {
-      String? saveDir;
-      bool useShareSheet = Platform.isIOS;
-
-      if (useShareSheet) {
-        final dir = await getTemporaryDirectory();
-        saveDir = dir.path;
-      } else {
-        try {
-          saveDir = await FilePicker.platform.getDirectoryPath();
-        } catch (e) {
-          log('Caught exception $e');
-        }
-      }
-
-      if (saveDir == null) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Download cancelled by user.')),
-          );
-        }
-        return;
-      }
-
-      final request = http.Request('GET', uri);
-      final response = await http.Client().send(request);
-
-      String fileName =
-          uri.pathSegments.isNotEmpty ? uri.pathSegments.last : 'download';
-      final contentType = response.headers['content-type'] ?? '';
-
-      if (!fileName.contains('.')) {
-        if (contentType.contains('video/webm')) {
-          fileName += '.webm';
-        } else if (contentType.contains('video/mp4')) {
-          fileName += '.mp4';
-        } else if (contentType.contains('image/jpeg')) {
-          fileName += '.jpg';
-        } else if (contentType.contains('image/png')) {
-          fileName += '.png';
-        } else if (contentType.contains('image/gif')) {
-          fileName += '.gif';
-        } else {
-          fileName += '.bin';
-        }
-      }
-
-      final filePath = '$saveDir/$fileName';
-      final file = File(filePath);
-      final total = response.contentLength ?? -1;
-      var received = 0;
-      final sink = file.openWrite();
-      final stopwatch = Stopwatch()..start();
-
-      await for (final chunk in response.stream) {
-        sink.add(chunk);
-        received += chunk.length;
-
-        if (total > 0) {
-          final progress = received / total;
-          final speed = received / (stopwatch.elapsedMilliseconds / 1000 + 0.001);
-          setState(() {
-            _progress = progress;
-            _speed = _formatSpeed(speed);
-          });
-        }
-      }
-
-      await sink.close();
-      stopwatch.stop();
-
-      // Corrected Fix for iOS Share Sheet Popover (sharePositionOrigin)
-      if (useShareSheet) {
-        final RenderBox? box = _downloadButtonKey.currentContext?.findRenderObject() as RenderBox?;
-        
-        Rect? shareRect;
-        if (box != null) {
-          shareRect = box.localToGlobal(Offset.zero) & box.size;
-        }
-
-        final xfile = XFile(filePath, name: fileName);
-        
-        await Share.shareXFiles(
-          [xfile], 
-          text: 'Downloaded: $fileName',
-          sharePositionOrigin: shareRect, 
-        );
-      }
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Downloaded: $fileName')),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download failed: $e')),
-        );
-      }
-      else {
-        
-      }
-    } finally {
+  // Use the extracted service
+  await DownloadService.downloadAndShareFile(
+    fileUrl: fileUrl,
+    source: widget.source,
+    userId: widget.userId,
+    apiKey: widget.apiKey,
+    context: context,
+    buttonKey: _downloadButtonKey,
+    onStart: () {
+      setState(() {
+        _downloading = true;
+        _progress = 0;
+        _speed = "Starting...";
+      });
+    },
+    onProgress: (progress, speed) {
+      setState(() {
+        _progress = progress;
+        _speed = speed;
+      });
+    },
+    onComplete: (success, message) {
       setState(() => _downloading = false);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
     }
-  }
+  );
+}
 
   String _formatSpeed(double bytesPerSecond) {
     if (bytesPerSecond < 1024) return '${bytesPerSecond.toStringAsFixed(2)} B/s';

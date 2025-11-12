@@ -226,9 +226,11 @@ class _CoomerStScreenState extends State<CoomerStScreen> with SingleTickerProvid
       log('Fetch Error (Tags): $e\n$stack');
       setState(() => _tagsError = 'Network/Parsing Error');
     } finally {
-      setState(() {
-        _tagsLoading = false;
-      });
+      if(mounted) {
+        setState(() {
+          _tagsLoading = false;
+        });
+      }
     }
   }
 
@@ -325,13 +327,15 @@ class _CoomerStScreenState extends State<CoomerStScreen> with SingleTickerProvid
           setState(() => _popularError = 'Network/Parsing Error');
       }
     } finally {
-      setState(() {
-        if (isPopularFeed) {
-          _popularLoading = false;
-        } else {
-          _isLoading = false;
-        }
-      });
+      if(mounted) {
+        setState(() {
+          if (isPopularFeed) {
+            _popularLoading = false;
+          } else {
+            _isLoading = false;
+          }
+        });
+      }
     }
   }
 
@@ -353,11 +357,13 @@ Future<void> _performGlobalFetch(Uri uri) async {
           .whereType<R34Post>()
           .toList();
 
-      setState(() {
-        _tagSearchPosts.addAll(newPosts);
-        _tagSearchCurrentPage++;
-        _tagSearchHasMore = newPosts.isNotEmpty;
-      });
+      if(mounted) {
+        setState(() {
+          _tagSearchPosts.addAll(newPosts);
+          _tagSearchCurrentPage++;
+          _tagSearchHasMore = newPosts.isNotEmpty;
+        });
+      }
     } else {
       log('HTTP Error (Global): ${response.statusCode} - ${response.body}');
       if (mounted) {
@@ -372,9 +378,11 @@ Future<void> _performGlobalFetch(Uri uri) async {
           const SnackBar(content: Text('A network or parsing error occurred for global search.')));
     }
   } finally {
-    setState(() {
-      _tagSearchLoading = false;
-    });
+    if(mounted) {
+      setState(() {
+        _tagSearchLoading = false;
+      });
+    }
   }
 }
 
@@ -827,8 +835,15 @@ Future<void> _performGlobalFetch(Uri uri) async {
               
               final post = _tagSearchPosts[index];
 
+              // ⭐ FIX: Defer the setState call
               if (_tagSearchPosts.isNotEmpty && index == _tagSearchPosts.length - 1 && !_tagSearchLoading && _tagSearchHasMore) {
-                _fetchTagSearchPosts(clearPrevious: false);
+                // We cannot call _fetchTagSearchPosts directly during a build.
+                // Schedule it to run right *after* the build is complete.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) { // Check if the widget is still in the tree
+                    _fetchTagSearchPosts(clearPrevious: false);
+                  }
+                });
               }
 
               final imageUrl = post.previewUrl;
